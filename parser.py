@@ -1,4 +1,3 @@
-import os
 import sys
 import logging
 
@@ -69,6 +68,9 @@ class Parser:
                 continue
 
             # Found the first real line
+            # ensure no comments at end of line
+            if '//' in stripped_line:
+                stripped_line = stripped_line.split('//')[0].strip()
             self.current_instruction = stripped_line
             break
     
@@ -81,29 +83,35 @@ class Parser:
     def advance(self):
         self._skip_comments_and_whitespace()
         LOG.debug(f'Current instruction: {self.current_instruction}')
-        if '=' in self.current_instruction:
-            self.current_dest = self.current_instruction.split('=')[0]
+        if self.current_instruction is not None:
+            if '=' in self.current_instruction:
+                self.current_dest = self.current_instruction.split('=')[0]
+            else:
+                self.current_dest = None
+            
+            if ';' in self.current_instruction:
+                self.current_jump = self.current_instruction.split(';')[1]
+            else:
+                self.current_jump = None
+            
+            if '=' in self.current_instruction and ';' in self.current_instruction:
+                comp_and_jump = self.current_instruction.split('=')[1]
+                self.current_comp = comp_and_jump.split(';')[0]
+            elif '=' in self.current_instruction:
+                self.current_comp = self.current_instruction.split('=')[1]
+            elif ';' in self.current_instruction:
+                self.current_comp = self.current_instruction.split(';')[0]
+            else:
+                self.current_comp = self.current_instruction
+            
+            LOG.debug(f'Dest: {self.current_dest}')
+            LOG.debug(f'Comp: {self.current_comp}')
+            LOG.debug(f'Jump: {self.current_jump}')
         else:
             self.current_dest = None
-        
-        if ';' in self.current_instruction:
-            self.current_jump = self.current_instruction.split(';')[1]
-        else:
+            self.current_comp = None
             self.current_jump = None
-        
-        if '=' in self.current_instruction and ';' in self.current_instruction:
-            comp_and_jump = self.current_instruction.split('=')[1]
-            self.current_comp = comp_and_jump.split(';')[0]
-        elif '=' in self.current_instruction:
-            self.current_comp = self.current_instruction.split('=')[1]
-        elif ';' in self.current_instruction:
-            self.current_comp = self.current_instruction.split(';')[0]
-        else:
-            self.current_comp = self.current_instruction
-        
-        LOG.debug(f'Dest: {self.current_dest}')
-        LOG.debug(f'Comp: {self.current_comp}')
-        LOG.debug(f'Jump: {self.current_jump}')
+            self.current_instruction = None
     
     def instructionType(self) -> str:
         if self.current_instruction.startswith('@'):
@@ -156,3 +164,8 @@ class Parser:
                 return None
         else:
             raise Exception('Error: jump() called on A or L instruction')
+        
+    def reset(self):
+        self.filestream.seek(0)
+        self._skip_comments_and_whitespace()
+        LOG.debug(f'(SECOND PASS) First instruction: {self.current_instruction}')
